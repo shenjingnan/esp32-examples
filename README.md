@@ -143,7 +143,7 @@ code /path/to/esp32-examples/examples/01-wifi-hello-world
 ```
 esp32-examples/
 ├── README.md                   # 项目说明文档
-├── LICENSE                     # MIT 许可证
+├── LICENSE                     # GNU GPL v3 许可证
 ├── .gitignore                  # Git 忽略配置
 └── examples/                   # 示例项目目录
     └── 01-wifi-hello-world/    # WiFi Captive Portal 示例
@@ -160,7 +160,7 @@ esp32-examples/
 
 ## 许可证
 
-本项目采用 [MIT 许可证](LICENSE)。
+本项目采用 [GNU GPL v3 许可证](LICENSE)。
 
 ## 参考资料
 
