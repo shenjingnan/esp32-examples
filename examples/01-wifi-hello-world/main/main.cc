@@ -1,10 +1,9 @@
-/* ESP32 WiFi Demo - Captive Portal
+/* ESP32 WiFi 示例 - 强制门户
 
-    This example code is in the Public Domain (or CC0 licensed, at your option.)
+    此示例代码属于公共领域（或根据您的选择采用 CC0 许可。）
 
-    Unless required by applicable law or agreed to in writing, this
-    software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
-    CONDITIONS OF ANY KIND, either express or implied.
+    除非适用法律要求或书面同意，否则本软件按"原样"分发，
+    不附带任何明示或暗示的担保或条件。
 */
 
 #include <sys/param.h>
@@ -42,11 +41,11 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
 
 static void wifi_init_softap(void)
 {
-    // Get MAC address before WiFi initialization
+    // 在 WiFi 初始化前获取 MAC 地址
     uint8_t mac[6];
     esp_read_mac(mac, ESP_MAC_WIFI_SOFTAP);
 
-    // Generate SSID: ESP32_WIFI_XXXXXX (last 3 bytes of MAC)
+    // 生成 SSID: ESP32_WIFI_XXXXXX（MAC 地址后3字节）
     char ssid[32];
     snprintf(ssid, sizeof(ssid), "ESP32_WIFI_%02X%02X%02X",
              mac[3], mac[4], mac[5]);
@@ -60,7 +59,7 @@ static void wifi_init_softap(void)
     strcpy(reinterpret_cast<char *>(wifi_config.ap.ssid), ssid);
     wifi_config.ap.ssid_len = strlen(ssid);
     wifi_config.ap.max_connection = 4;
-    wifi_config.ap.authmode = WIFI_AUTH_OPEN;  // Open WiFi, no password
+    wifi_config.ap.authmode = WIFI_AUTH_OPEN;  // 开放 WiFi，无密码
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_config));
@@ -76,7 +75,7 @@ static void wifi_init_softap(void)
     ESP_LOGI(TAG, "wifi_init_softap finished. SSID:'%s' (open, no password)", ssid);
 }
 
-// HTTP GET Handler
+// HTTP GET 处理函数
 static esp_err_t root_get_handler(httpd_req_t *req)
 {
     const uint32_t root_len = index_end - index_start;
@@ -94,14 +93,14 @@ static const httpd_uri_t root = {
     .handler = root_get_handler
 };
 
-// HTTP Error (404) Handler - Redirects all requests to the root page
+// HTTP 错误（404）处理函数 - 将所有请求重定向到根页面
 esp_err_t http_404_error_handler(httpd_req_t *req, httpd_err_code_t err)
 {
-    // Set status
+    // 设置状态码
     httpd_resp_set_status(req, "302 Temporary Redirect");
-    // Redirect to the "/" root directory
+    // 重定向到 "/" 根目录
     httpd_resp_set_hdr(req, "Location", "/");
-    // iOS requires content in the response to detect a captive portal, simply redirecting is not sufficient.
+    // iOS 需要响应中包含内容才能检测强制门户，仅重定向是不够的。
     httpd_resp_send(req, "Redirect to the captive portal", HTTPD_RESP_USE_STRLEN);
 
     ESP_LOGI(TAG, "Redirecting to root");
@@ -115,10 +114,10 @@ static httpd_handle_t start_webserver(void)
     config.max_open_sockets = 13;
     config.lru_purge_enable = true;
 
-    // Start the httpd server
+    // 启动 HTTP 服务器
     ESP_LOGI(TAG, "Starting server on port: '%d'", config.server_port);
     if (httpd_start(&server, &config) == ESP_OK) {
-        // Set URI handlers
+        // 注册 URI 处理函数
         ESP_LOGI(TAG, "Registering URI handlers");
         httpd_register_uri_handler(server, &root);
         httpd_register_err_handler(server, HTTPD_404_NOT_FOUND, http_404_error_handler);
@@ -129,32 +128,31 @@ static httpd_handle_t start_webserver(void)
 extern "C" void app_main(void)
 {
     /*
-        Turn off warnings from HTTP server as redirecting traffic will yield
-        lots of invalid requests
+        关闭 HTTP 服务器的警告日志，因为重定向流量会产生大量无效请求
     */
     esp_log_level_set("httpd_uri", ESP_LOG_ERROR);
     esp_log_level_set("httpd_txrx", ESP_LOG_ERROR);
     esp_log_level_set("httpd_parse", ESP_LOG_ERROR);
 
-    // Initialize networking stack
+    // 初始化网络协议栈
     ESP_ERROR_CHECK(esp_netif_init());
 
-    // Create default event loop needed by the main app
+    // 创建主应用所需的默认事件循环
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
-    // Initialize NVS needed by Wi-Fi
+    // 初始化 WiFi 所需的 NVS
     ESP_ERROR_CHECK(nvs_flash_init());
 
-    // Initialize Wi-Fi including netif with default config
+    // 使用默认配置初始化 WiFi（包括 netif）
     esp_netif_create_default_wifi_ap();
 
-    // Initialise ESP32 in SoftAP mode
+    // 将 ESP32 初始化为 SoftAP 模式
     wifi_init_softap();
 
-    // Start the server for the first time
+    // 首次启动 Web 服务器
     start_webserver();
 
-    // Start the DNS server that will redirect all queries to the softAP IP
+    // 启动 DNS 服务器，将所有查询重定向到 softAP IP
     dns_server_config_t config = DNS_SERVER_CONFIG_SINGLE("*" /* all A queries */, "WIFI_AP_DEF" /* softAP netif ID */);
     start_dns_server(&config);
 }

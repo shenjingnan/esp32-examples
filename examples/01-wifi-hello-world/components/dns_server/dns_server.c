@@ -28,7 +28,7 @@
 
 static const char *TAG = "example_dns_redirect_server";
 
-// DNS Header Packet
+// DNS 报头结构
 typedef struct __attribute__((__packed__))
 {
     uint16_t id;
@@ -39,13 +39,13 @@ typedef struct __attribute__((__packed__))
     uint16_t ar_count;
 } dns_header_t;
 
-// DNS Question Packet
+// DNS 问题结构
 typedef struct {
     uint16_t type;
     uint16_t class;
 } dns_question_t;
 
-// DNS Answer Packet
+// DNS 回答结构
 typedef struct __attribute__((__packed__))
 {
     uint16_t ptr_offset;
@@ -56,7 +56,7 @@ typedef struct __attribute__((__packed__))
     uint32_t ip_addr;
 } dns_answer_t;
 
-// DNS server handle
+// DNS 服务器句柄
 struct dns_server_handle {
     bool started;
     TaskHandle_t task;
@@ -65,8 +65,8 @@ struct dns_server_handle {
 };
 
 /*
-    Parse the name from the packet from the DNS name format to a regular .-seperated name
-    returns the pointer to the next part of the packet
+    将 DNS 名称格式解析为标准的点分域名格式
+    返回指向数据包下一部分的指针
 */
 static char *parse_dns_name(char *raw_name, char *parsed_name, size_t parsed_name_max_len)
 {
@@ -77,47 +77,47 @@ static char *parse_dns_name(char *raw_name, char *parsed_name, size_t parsed_nam
 
     do {
         int sub_name_len = *label;
-        // (len + 1) since we are adding  a '.'
+        // (len + 1) 因为要添加 '.'
         name_len += (sub_name_len + 1);
         if (name_len > parsed_name_max_len) {
             return NULL;
         }
 
-        // Copy the sub name that follows the the label
+        // 复制标签后的子名称
         memcpy(name_itr, label + 1, sub_name_len);
         name_itr[sub_name_len] = '.';
         name_itr += (sub_name_len + 1);
         label += sub_name_len + 1;
     } while (*label != 0);
 
-    // Terminate the final string, replacing the last '.'
+    // 终止字符串，替换最后的 '.'
     parsed_name[name_len - 1] = '\0';
-    // Return pointer to first char after the name
+    // 返回名称后第一个字符的指针
     return label + 1;
 }
 
-// Parses the DNS request and prepares a DNS response with the IP of the softAP
+// 解析 DNS 请求并准备 DNS 响应，返回 softAP 的 IP 地址
 static int parse_dns_request(char *req, size_t req_len, char *dns_reply, size_t dns_reply_max_len, dns_server_handle_t h)
 {
     if (req_len > dns_reply_max_len) {
         return -1;
     }
 
-    // Prepare the reply
+    // 准备响应
     memset(dns_reply, 0, dns_reply_max_len);
     memcpy(dns_reply, req, req_len);
 
-    // Endianess of NW packet different from chip
+    // 网络字节序与芯片字节序不同
     dns_header_t *header = (dns_header_t *)dns_reply;
     ESP_LOGD(TAG, "DNS query with header id: 0x%X, flags: 0x%X, qd_count: %d",
              ntohs(header->id), ntohs(header->flags), ntohs(header->qd_count));
 
-    // Not a standard query
+    // 非标准查询
     if ((header->flags & OPCODE_MASK) != 0) {
         return 0;
     }
 
-    // Set question response flag
+    // 设置查询响应标志
     header->flags |= QR_FLAG;
 
     uint16_t qd_count = ntohs(header->qd_count);
@@ -128,12 +128,12 @@ static int parse_dns_request(char *req, size_t req_len, char *dns_reply, size_t 
         return -1;
     }
 
-    // Pointer to current answer and question
+    // 当前回答和问题的指针
     char *cur_ans_ptr = dns_reply + req_len;
     char *cur_qd_ptr = dns_reply + sizeof(dns_header_t);
     char name[128];
 
-    // Respond to all questions based on configured rules
+    // 根据配置规则响应所有问题
     for (int qd_i = 0; qd_i < qd_count; qd_i++) {
         char *name_end_ptr = parse_dns_name(cur_qd_ptr, name, sizeof(name));
         if (name_end_ptr == NULL) {
@@ -149,9 +149,9 @@ static int parse_dns_request(char *req, size_t req_len, char *dns_reply, size_t 
 
         if (qd_type == QD_TYPE_A) {
             esp_ip4_addr_t ip = { .addr = IPADDR_ANY };
-            // Check the configured rules to decide whether to answer this question or not
+            // 检查配置规则决定是否回答此问题
             for (int i = 0; i < h->num_of_entries; ++i) {
-                // check if the name either corresponds to the entry, or if we should answer to all queries ("*")
+                // 检查名称是否匹配条目或应回答所有查询（"*"）
                 if (strcmp(h->entry[i].name, "*") == 0 || strcmp(h->entry[i].name, name) == 0) {
                     if (h->entry[i].if_key) {
                         esp_netif_ip_info_t ip_info;
@@ -164,7 +164,7 @@ static int parse_dns_request(char *req, size_t req_len, char *dns_reply, size_t 
                     }
                 }
             }
-            if (ip.addr == IPADDR_ANY) {    // no rule applies, continue with another question
+            if (ip.addr == IPADDR_ANY) {    // 无匹配规则，继续处理下一个问题
                 continue;
             }
             dns_answer_t *answer = (dns_answer_t *)cur_ans_ptr;
@@ -184,8 +184,8 @@ static int parse_dns_request(char *req, size_t req_len, char *dns_reply, size_t 
 }
 
 /*
-    Sets up a socket and listen for DNS queries,
-    replies to all type A queries with the IP of the softAP
+    创建 socket 并监听 DNS 查询，
+    对所有 A 类型查询返回 softAP 的 IP 地址
 */
 void dns_server_task(void *pvParameters)
 {
@@ -224,22 +224,22 @@ void dns_server_task(void *pvParameters)
             socklen_t socklen = sizeof(source_addr);
             int len = recvfrom(sock, rx_buffer, sizeof(rx_buffer) - 1, 0, (struct sockaddr *)&source_addr, &socklen);
 
-            // Error occurred during receiving
+            // 接收时发生错误
             if (len < 0) {
                 ESP_LOGE(TAG, "recvfrom failed: errno %d", errno);
                 close(sock);
                 break;
             }
-            // Data received
+            // 已接收数据
             else {
-                // Get the sender's ip address as string
+                // 获取发送者 IP 地址字符串
                 if (source_addr.sin6_family == PF_INET) {
                     inet_ntoa_r(((struct sockaddr_in *)&source_addr)->sin_addr.s_addr, addr_str, sizeof(addr_str) - 1);
                 } else if (source_addr.sin6_family == PF_INET6) {
                     inet6_ntoa_r(source_addr.sin6_addr, addr_str, sizeof(addr_str) - 1);
                 }
 
-                // Null-terminate whatever we received and treat like a string...
+                // 将接收的数据添加空终止符并作为字符串处理...
                 rx_buffer[len] = 0;
 
                 char reply[DNS_MAX_LEN];
