@@ -23,14 +23,38 @@
 
 ## 快速开始
 
-### 1. 克隆项目
+### 方式一：使用预编译二进制文件（推荐新手）
+
+如果你没有 ESP-IDF 开发环境，可以直接使用预编译的二进制文件通过在线工具烧录。
+
+#### 1. 下载二进制文件
+
+从项目的 `release/merged-binary.bin` 下载预编译的二进制文件。
+
+#### 2. 在线烧录
+
+1. 打开 [ESP Launchpad](https://espressif.github.io/esp-launchpad/) 在线烧录工具
+2. 选择对应的 ESP32 芯片型号
+3. 点击"Connect"连接设备（需要浏览器支持 Web Serial）
+4. 选择下载的 `merged-binary.bin` 文件，设置烧录地址为 `0x0`
+5. 点击"Program"开始烧录
+
+> **注意**:
+> - 需要使用支持 Web Serial 的浏览器（推荐 Chrome、Edge）
+> - 预编译的二进制文件是按照默认配置编译的，如需自定义配置，请使用方式二从源码构建
+
+---
+
+### 方式二：从源码构建（需要 ESP-IDF 环境）
+
+#### 1. 克隆项目
 
 ```bash
 git clone https://github.com/shenjingnan/esp32-wifi-demo.git
 cd esp32-wifi-demo
 ```
 
-### 2. 设置 ESP-IDF 环境
+#### 2. 设置 ESP-IDF 环境
 
 ```bash
 # 如果已安装 ESP-IDF，激活环境
@@ -40,13 +64,13 @@ cd esp32-wifi-demo
 get_idf
 ```
 
-### 3. 构建项目
+#### 3. 构建项目
 
 ```bash
 idf.py build
 ```
 
-### 4. 烧录到设备
+#### 4. 烧录到设备
 
 ```bash
 # 连接 ESP32 开发板，然后执行
@@ -58,7 +82,7 @@ idf.py -p PORT flash
 # idf.py -p /dev/tty.usbserial-110 flash  # macOS
 ```
 
-### 5. 查看日志输出
+#### 5. 查看日志输出
 
 ```bash
 idf.py -p PORT monitor
@@ -81,6 +105,8 @@ esp32-wifi-demo/
 ├── CMakeLists.txt              # 根目录 CMake 配置
 ├── sdkconfig.defaults          # SDK 默认配置
 ├── README.md                   # 项目说明文档
+├── release/
+│   └── merged-binary.bin       # 预编译的二进制文件
 ├── main/
 │   ├── CMakeLists.txt          # main 组件 CMake 配置
 │   ├── main.cc                 # 主程序源代码（C++）
