@@ -1,43 +1,43 @@
-# Prerequisites
+# 前置依赖
 *.d
 
-# Compiled Object files
+# 编译的目标文件
 *.slo
 *.lo
 *.o
 *.obj
 
-# Precompiled Headers
+# 预编译头文件
 *.gch
 *.pch
 
-# Linker files
+# 链接器文件
 *.ilk
 
-# Debugger Files
+# 调试器文件
 *.pdb
 
-# Compiled Dynamic libraries
+# 编译的动态库
 *.so
 *.dylib
 *.dll
 
-# Fortran module files
+# Fortran 模块文件
 *.mod
 *.smod
 
-# Compiled Static libraries
+# 编译的静态库
 *.lai
 *.la
 *.a
 *.lib
 
-# Executables
+# 可执行文件
 *.exe
 *.out
 *.app
 
-# debug information files
+# 调试信息文件
 *.dwo
 
 # ==================== ESP-IDF ====================

@@ -20,22 +20,22 @@ extern "C" {
         }
 
 /**
- * @brief Definition of one DNS entry: NAME - IP (or the netif whose IP to answer)
+ * @brief DNS 条目定义：名称 - IP（或使用网络接口的 IP 进行应答）
  *
- * @note Please use string literals (or ensure they are valid during dns_server lifetime) as names, since
- * we don't take copies of the config values `name` and `if_key`
+ * @note 请使用字符串字面量（或确保它们在 dns_server 生命周期内有效）作为名称，
+ * 因为我们不会复制配置值 `name` 和 `if_key`
  */
 typedef struct dns_entry_pair {
-    const char* name;       /**<! Exact match of the name field of the DNS query to answer */
-    const char* if_key;     /**<! Use this network interface IP to answer, only if NULL, use the static IP below */
-    esp_ip4_addr_t ip;      /**<! Constant IP address to answer this query, if "if_key==NULL" */
+    const char* name;       /**<! DNS 查询名称的精确匹配 */
+    const char* if_key;     /**<! 使用此网络接口的 IP 进行应答，仅当为 NULL 时使用下面的静态 IP */
+    esp_ip4_addr_t ip;      /**<! 用于应答此查询的固定 IP 地址，当 "if_key==NULL" 时使用 */
 } dns_entry_pair_t;
 
 /**
- * @brief DNS server config struct defining the rules for answering DNS (A type) queries
+ * @brief DNS 服务器配置结构，定义应答 DNS（A 类型）查询的规则
  *
- * @note If you want to define more rules, you can set `DNS_SERVER_MAX_ITEMS` before including this header
- * Example of using 2 entries with constant IP addresses
+ * @note 如果要定义更多规则，可以在包含此头文件之前设置 `DNS_SERVER_MAX_ITEMS`
+ * 使用 2 个条目和固定 IP 地址的示例：
  * \code{.c}
  * #define DNS_SERVER_MAX_ITEMS 2
  * #include "dns_server.h"
@@ -48,27 +48,27 @@ typedef struct dns_entry_pair {
  * \endcode
  */
 typedef struct dns_server_config {
-    int num_of_entries;                             /**<! Number of rules specified in the config struct */
-    dns_entry_pair_t item[DNS_SERVER_MAX_ITEMS];    /**<! Array of pairs */
+    int num_of_entries;                             /**<! 配置结构中指定的规则数量 */
+    dns_entry_pair_t item[DNS_SERVER_MAX_ITEMS];    /**<! 条目数组 */
 } dns_server_config_t;
 
 /**
- * @brief DNS server handle
+ * @brief DNS 服务器句柄
  */
 typedef struct dns_server_handle *dns_server_handle_t;
 
 /**
- * @brief Set ups and starts a simple DNS server that will respond to all A queries (IPv4)
- * based on configured rules, pairs of name and either IPv4 address or a netif ID (to respond by it's IPv4 add)
+ * @brief 设置并启动一个简单的 DNS 服务器，根据配置规则响应所有 A 类型查询（IPv4），
+ * 规则为名称和 IPv4 地址或网络接口 ID（使用其 IPv4 地址响应）的配对
  *
- * @param config Configuration structure listing the pairs of (name, IP/netif-id)
- * @return dns_server's handle on success, NULL on failure
+ * @param config 配置结构，列出（名称，IP/网络接口 ID）配对
+ * @return 成功返回 DNS 服务器句柄，失败返回 NULL
  */
 dns_server_handle_t start_dns_server(dns_server_config_t *config);
 
 /**
- * @brief Stops and destroys DNS server's task and structs
- * @param handle DNS server's handle to destroy
+ * @brief 停止并销毁 DNS 服务器任务和结构
+ * @param handle 要销毁的 DNS 服务器句柄
  */
 void stop_dns_server(dns_server_handle_t handle);
 
