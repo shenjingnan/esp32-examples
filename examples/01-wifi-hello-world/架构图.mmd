@@ -1,0 +1,27 @@
+graph
+  subgraph ESP32["ESP32 设备"]
+      subgraph WiFi["WiFi AP (SoftAP)"]
+          SSID["SSID:<br/>ESP32_WIFI_XXXXXX"]
+          SSID --> IP["IP:<br/>192.168.4.1"]
+      end
+      
+      subgraph DNS["DNS Server (Port 53)"]
+          DNS_INT["拦截所有<br/>DNS 查询"]
+          DNS_INT --> DNS_RET["返回本地 IP"]
+      end
+      
+      subgraph HTTP["HTTP Server (Port 80)"]
+          GET["GET /"]
+          GET --> INDEX["→ index.html"]
+          HANDLER["404 Handler"]
+          HANDLER --> REDIRECT["→ 302 → /"]
+      end
+  end
+  
+  WiFi -->|DNS 查询| DNS
+  DNS -->|IP 地址| HTTP
+  
+  style ESP32 fill:#f5f5f5,stroke:#333,stroke-width:3px
+  style WiFi fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+  style DNS fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+  style HTTP fill:#e8f5e9,stroke:#388e3c,stroke-width:2px

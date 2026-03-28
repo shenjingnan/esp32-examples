@@ -1,0 +1,33 @@
+sequenceDiagram
+    autonumber
+    participant 手机 as 用户设备<br/>(手机/电脑)
+    participant wifi as WiFi AP<br/>(ESP32热点)
+    participant dns as DNS Server<br/>(端口53)
+    participant http as HTTP Server<br/>(端口80)
+
+    Note over 手机,wifi: 阶段一：建立WiFi连接
+    手机->>wifi: 扫描WiFi热点
+    wifi-->>手机: 发现 SSID: ESP32_WIFI_XXXXXX
+    手机->>wifi: 发起连接请求
+    wifi-->>手机: 连接成功，分配IP
+
+    Note over 手机,dns: 阶段二：网络检测(DNS查询)
+    手机->>dns: DNS查询 connectivity-check.apple.com
+    Note right of 手机: iOS设备检测网络<br/>Android会用其他域名
+    dns->>dns: 解析请求，匹配规则"*"
+    dns-->>手机: 返回 192.168.4.1
+    Note right of dns: 劫持！返回ESP32的IP<br/>而非真实IP
+
+    Note over 手机,http: 阶段三：HTTP访问(触发Portal)
+    手机->>http: HTTP GET connectivity-check.apple.com
+    Note right of 手机: 手机尝试访问检测URL
+    http->>http: 路径不存在，触发404处理器
+    http-->>手机: 302 Redirect → Location: /
+    Note right of http: 关键！重定向到首页
+
+    Note over 手机,http: 阶段四：展示页面
+    手机->>http: HTTP GET /
+    http-->>手机: 200 OK + HTML内容
+    Note right of http: 返回嵌入式网页
+
+    Note over 手机: 系统检测到Portal<br/>自动弹出页面
