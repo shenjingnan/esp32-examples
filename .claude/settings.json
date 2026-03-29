@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:components.espressif.com)",
+      "WebFetch(domain:github.com)",
+      "mcp__web-search-prime__web_search_prime",
+      "mcp__plugin_context7_context7__resolve-library-id",
+      "mcp__plugin_context7_context7__query-docs",
+      "Skill(commit-commands:commit-push-pr)"
+    ]
+  },
+  "attribution": {
+    "commit": "🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: GLM-5.1 <noreply@bigmodel.cn>",
+    "pr": ""
+  }
+}
