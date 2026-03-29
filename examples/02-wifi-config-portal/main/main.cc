@@ -114,6 +114,22 @@ static const char *get_disconnect_reason(uint8_t reason)
     }
 }
 
+// 将 RSSI 信号强度转换为格数（0-4）
+static int rssi_to_bars(int rssi)
+{
+    if (rssi >= -50) return 4;
+    if (rssi >= -60) return 3;
+    if (rssi >= -70) return 2;
+    if (rssi >= -80) return 1;
+    return 0;
+}
+
+// 判断 WiFi 是否加密
+static bool is_encrypted(wifi_auth_mode_t auth_mode)
+{
+    return auth_mode != WIFI_AUTH_OPEN;
+}
+
 // ==================== 事件处理 ====================
 
 static void wifi_event_handler(void *arg, esp_event_base_t event_base,
@@ -182,7 +198,7 @@ static void wifi_init_softap(void)
     wifi_config.ap.max_connection = 4;
     wifi_config.ap.authmode = WIFI_AUTH_OPEN;
 
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_config));
     ESP_ERROR_CHECK(esp_wifi_start());
 
@@ -283,6 +299,99 @@ static esp_err_t status_get_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+// GET /scan - 扫描周围 WiFi 并返回 JSON 列表
+static esp_err_t scan_get_handler(httpd_req_t *req)
+{
+    wifi_scan_config_t scan_config = {};
+    scan_config.ssid = nullptr;
+    scan_config.bssid = nullptr;
+    scan_config.channel = 0;
+    scan_config.show_hidden = false;
+    scan_config.scan_type = WIFI_SCAN_TYPE_ACTIVE;
+    scan_config.scan_time.active.min = 0;
+    scan_config.scan_time.active.max = 120;  // 120ms per channel
+
+    esp_err_t ret = esp_wifi_scan_start(&scan_config, true);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "WiFi scan failed: %s", esp_err_to_name(ret));
+        httpd_resp_set_status(req, "500 Internal Server Error");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_send(req, "{\"error\":\"scan_failed\"}", HTTPD_RESP_USE_STRLEN);
+        return ESP_OK;
+    }
+
+    uint16_t ap_count = 0;
+    esp_wifi_scan_get_ap_num(&ap_count);
+    if (ap_count == 0) {
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
+        httpd_resp_send(req, "[]", HTTPD_RESP_USE_STRLEN);
+        return ESP_OK;
+    }
+
+    // 限制最多获取 20 个 AP
+    if (ap_count > 20) {
+        ap_count = 20;
+    }
+
+    wifi_ap_record_t ap_records[20];
+    uint16_t actual_count = ap_count;
+    esp_wifi_scan_get_ap_records(&actual_count, ap_records);
+
+    // 分配 JSON 缓冲区
+    char *json_buf = (char *)malloc(3072);
+    if (!json_buf) {
+        httpd_resp_set_status(req, "500 Internal Server Error");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_send(req, "{\"error\":\"no_memory\"}", HTTPD_RESP_USE_STRLEN);
+        return ESP_OK;
+    }
+
+    int pos = 0;
+    json_buf[pos++] = '[';
+
+    for (int i = 0; i < actual_count; i++) {
+        if (i > 0) {
+            json_buf[pos++] = ',';
+        }
+
+        // 转义 SSID 中的特殊字符
+        char escaped_ssid[128];
+        const char *src = (const char *)ap_records[i].ssid;
+        int epos = 0;
+        for (int j = 0; src[j] && epos < (int)sizeof(escaped_ssid) - 2; j++) {
+            if (src[j] == '"' || src[j] == '\\') {
+                if (epos < (int)sizeof(escaped_ssid) - 2) {
+                    escaped_ssid[epos++] = '\\';
+                }
+            }
+            // 过滤非打印字符
+            if (src[j] >= 0x20) {
+                escaped_ssid[epos++] = src[j];
+            }
+        }
+        escaped_ssid[epos] = '\0';
+
+        pos += snprintf(json_buf + pos, 3072 - pos,
+            "{\"ssid\":\"%s\",\"rssi\":%d,\"bars\":%d,\"encrypted\":%s,\"channel\":%d}",
+            escaped_ssid,
+            ap_records[i].rssi,
+            rssi_to_bars(ap_records[i].rssi),
+            is_encrypted(ap_records[i].authmode) ? "true" : "false",
+            ap_records[i].primary);
+    }
+
+    json_buf[pos++] = ']';
+    json_buf[pos] = '\0';
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
+    httpd_resp_send(req, json_buf, pos);
+
+    free(json_buf);
+    return ESP_OK;
+}
+
 // HTTP 错误（404）处理函数 - 将所有请求重定向到根页面
 esp_err_t http_404_error_handler(httpd_req_t *req, httpd_err_code_t err)
 {
@@ -314,6 +423,12 @@ static const httpd_uri_t status_uri = {
     .handler = status_get_handler
 };
 
+static const httpd_uri_t scan_uri = {
+    .uri = "/scan",
+    .method = HTTP_GET,
+    .handler = scan_get_handler
+};
+
 static httpd_handle_t start_webserver(void)
 {
     httpd_handle_t server = nullptr;
@@ -327,6 +442,7 @@ static httpd_handle_t start_webserver(void)
         httpd_register_uri_handler(server, &root);
         httpd_register_uri_handler(server, &connect_uri);
         httpd_register_uri_handler(server, &status_uri);
+        httpd_register_uri_handler(server, &scan_uri);
         httpd_register_err_handler(server, HTTPD_404_NOT_FOUND, http_404_error_handler);
     }
     return server;
