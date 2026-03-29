@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>WiFi 配置</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:Arial,sans-serif;background:#f0f2f5;display:flex;justify-content:center;align-items:center;min-height:100vh}
+.card{background:#fff;padding:30px 24px;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.08);width:90%;max-width:340px}
+h2{text-align:center;color:#333;margin-bottom:20px;font-size:20px}
+input{width:100%;padding:10px 12px;margin:8px 0;border:1px solid #ddd;border-radius:6px;font-size:15px;outline:none}
+input:focus{border-color:#4a90d9}
+button{width:100%;padding:11px;margin:10px 0 0;border:none;border-radius:6px;font-size:16px;cursor:pointer;transition:opacity .2s}
+.btn-primary{background:#4a90d9;color:#fff}
+.btn-primary:hover{opacity:.85}
+.btn-primary:disabled{background:#b0c4de;cursor:not-allowed}
+.btn-secondary{background:#e8e8e8;color:#333}
+.btn-secondary:hover{background:#d8d8d8}
+.msg{text-align:center;padding:16px 0;color:#555;font-size:15px;line-height:1.6}
+.msg .ip{color:#4a90d9;font-weight:bold;margin:4px 0;display:block}
+.msg .err{color:#e74c3c}
+.msg .countdown{font-size:28px;color:#27ae60;font-weight:bold;margin:8px 0;display:block}
+.hidden{display:none}
+label{display:block;font-size:13px;color:#666;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="card">
+  <div id="form-section">
+    <h2>WiFi 配置</h2>
+    <form id="wifi-form" onsubmit="return doConnect(event)">
+      <label for="ssid">WiFi 名称</label>
+      <input type="text" id="ssid" name="ssid" placeholder="请输入 WiFi 名称" required>
+      <label for="password">WiFi 密码</label>
+      <input type="password" id="password" name="password" placeholder="开放网络请留空">
+      <button type="submit" class="btn-primary" id="btn-connect">连接</button>
+    </form>
+  </div>
+  <div id="status-section" class="hidden">
+    <div class="msg" id="status-msg"></div>
+  </div>
+</div>
+<script>
+var pollTimer=null;
+function clearEl(el){while(el.firstChild)el.removeChild(el.firstChild);}
+function makeTag(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e;}
+function doConnect(e){
+  e.preventDefault();
+  var ssid=document.getElementById('ssid').value;
+  var pwd=document.getElementById('password').value;
+  if(!ssid){return false;}
+  document.getElementById('btn-connect').disabled=true;
+  document.getElementById('form-section').className='hidden';
+  document.getElementById('status-section').className='';
+  showConnecting();
+  var xhr=new XMLHttpRequest();
+  xhr.open('POST','/connect',true);
+  xhr.setRequestHeader('Content-Type','application/x-www-form-urlencoded');
+  xhr.send('ssid='+encodeURIComponent(ssid)+'&password='+encodeURIComponent(pwd));
+  xhr.onload=function(){
+    if(xhr.status===200){startPoll();}
+    else{showError('请求失败，请重试');}
+  };
+  xhr.onerror=function(){showError('请求失败，请重试');};
+  return false;
+}
+function startPoll(){pollTimer=setInterval(checkStatus,1000);}
+function checkStatus(){
+  var xhr=new XMLHttpRequest();
+  xhr.open('GET','/status',true);
+  xhr.onload=function(){
+    if(xhr.status!==200){return;}
+    var d=JSON.parse(xhr.responseText);
+    if(d.status==='connected'){
+      clearInterval(pollTimer);pollTimer=null;
+      showCountdown(d.ip,3);
+    }else if(d.status==='failed'){
+      clearInterval(pollTimer);pollTimer=null;
+      showError(d.reason||'连接失败');
+    }
+  };
+  xhr.send();
+}
+function showConnecting(){
+  var el=document.getElementById('status-msg');clearEl(el);
+  el.appendChild(document.createTextNode('正在连接...'));
+}
+function showCountdown(ip,sec){
+  var el=document.getElementById('status-msg');clearEl(el);
+  el.appendChild(document.createTextNode('连接成功！'));
+  el.appendChild(makeTag('span','ip','IP: '+ip));
+  var cd=makeTag('span','countdown',String(sec));
+  el.appendChild(cd);
+  el.appendChild(document.createTextNode('秒后可关闭此页面'));
+  var s=sec;
+  var t=setInterval(function(){s--;if(s<=0){clearInterval(t);clearEl(el);el.appendChild(document.createTextNode('连接成功！'));el.appendChild(makeTag('span','ip','IP: '+ip));el.appendChild(document.createTextNode('现在可以关闭此页面'));}else{cd.textContent=String(s);}},1000);
+}
+function showError(reason){
+  var el=document.getElementById('status-msg');clearEl(el);
+  var errLine=makeTag('span','err','连接失败');
+  el.appendChild(errLine);
+  el.appendChild(document.createElement('br'));
+  el.appendChild(document.createTextNode(reason));
+  el.appendChild(document.createElement('br'));
+  var btn=makeTag('button','btn-secondary','重新配置');
+  btn.style.marginTop='12px';
+  btn.onclick=resetForm;
+  el.appendChild(btn);
+}
+function resetForm(){
+  if(pollTimer){clearInterval(pollTimer);pollTimer=null;}
+  document.getElementById('form-section').className='';
+  document.getElementById('status-section').className='hidden';
+  document.getElementById('btn-connect').disabled=false;
+  document.getElementById('password').value='';
+}
+</script>
+</body>
+</html>

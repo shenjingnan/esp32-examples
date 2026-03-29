@@ -61,6 +61,7 @@ idf.py -p PORT flash monitor
 | 编号 | 示例名称 | 描述 |
 |------|----------|------|
 | 01 | [WiFi Hello World](examples/01-wifi-hello-world/) | WiFi Captive Portal 示例，创建热点并自动弹出 Web 页面 |
+| 02 | [WiFi Config Portal](examples/02-wifi-config-portal/) | WiFi 强制门户配网，通过表单配置 WiFi 连接 |
 
 > 更多示例持续更新中...
 
@@ -146,7 +147,8 @@ esp32-examples/
 ├── LICENSE                     # GNU GPL v3 许可证
 ├── .gitignore                  # Git 忽略配置
 └── examples/                   # 示例项目目录
-    └── 01-wifi-hello-world/    # WiFi Captive Portal 示例
+    ├── 01-wifi-hello-world/    # WiFi Captive Portal 示例
+    └── 02-wifi-config-portal/  # WiFi 强制门户配网示例
 ```
 
 ## 贡献指南
