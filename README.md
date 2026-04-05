@@ -63,6 +63,7 @@ idf.py -p PORT flash monitor
 | 01 | [WiFi Hello World](examples/01-wifi-hello-world/) | WiFi Captive Portal 示例，创建热点并自动弹出 Web 页面 |
 | 02 | [WiFi Config Portal](examples/02-wifi-config-portal/) | WiFi 强制门户配网，通过表单配置 WiFi 连接 |
 | 03 | [RGB LED 彩色循环](examples/03-rgb-led-color-cycle/) | 使用 WS2812 RGB LED 实现红、黄、蓝三色循环切换 |
+| 04 | [WiFi 色盘控制 LED](examples/04-wifi-color-picker/) | WiFi AP 热点 + 浏览器色盘通过 WebSocket 实时控制 WS2812 LED 颜色 |
 
 > 更多示例持续更新中...
 
@@ -150,7 +151,8 @@ esp32-examples/
 └── examples/                   # 示例项目目录
     ├── 01-wifi-hello-world/    # WiFi Captive Portal 示例
     ├── 02-wifi-config-portal/  # WiFi 强制门户配网示例
-    └── 03-rgb-led-color-cycle/ # RGB LED 彩色循环示例
+    ├── 03-rgb-led-color-cycle/ # RGB LED 彩色循环示例
+    └── 04-wifi-color-picker/   # WiFi 色盘控制 LED 示例
 ```
 
 ## 贡献指南
