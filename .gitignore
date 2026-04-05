@@ -79,3 +79,6 @@ coverage_report/
 
 # ==================== Cache ====================
 .cache/
+
+settings.local.json
+.agents/settings.local.json
