@@ -82,3 +82,5 @@ coverage_report/
 
 settings.local.json
 .agents/settings.local.json
+
+tmp
