@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>ESP32 色盘</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,sans-serif;
+  background:#0f0f1a;color:#fff;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:100vh;touch-action:none;-webkit-user-select:none;user-select:none;
+  overflow:hidden;
+}
+h1{font-size:1.1rem;margin-bottom:1.2rem;font-weight:400;letter-spacing:.08em;opacity:.6}
+#wc{position:relative;width:280px;height:280px}
+canvas{width:100%;height:100%;border-radius:50%;cursor:crosshair}
+#ind{
+  position:absolute;width:28px;height:28px;border:3px solid #fff;border-radius:50%;
+  pointer-events:none;transform:translate(-50%,-50%);
+  box-shadow:0 2px 8px rgba(0,0,0,.6),inset 0 0 4px rgba(0,0,0,.2);
+  display:none;top:50%;left:50%;
+}
+#pv{
+  width:52px;height:52px;border-radius:50%;margin-top:1.4rem;
+  border:3px solid rgba(255,255,255,.15);background:#000;
+  box-shadow:0 0 16px rgba(0,0,0,.3);
+}
+.ctrl{margin-top:1rem;display:flex;flex-direction:column;align-items:center;gap:.2rem}
+input[type=range]{width:240px;accent-color:#666}
+.lbl{font-size:.75rem;opacity:.45}
+.btn{
+  margin-top:.8rem;padding:.45rem 1.6rem;border:1px solid rgba(255,255,255,.15);
+  background:transparent;color:#fff;border-radius:20px;font-size:.85rem;
+  cursor:pointer;transition:all .15s;
+}
+.btn:active{background:rgba(255,255,255,.08)}
+#st{position:fixed;bottom:.8rem;font-size:.65rem;opacity:.35;display:flex;gap:10px;align-items:center}
+#st a{color:#fff;opacity:.7;text-decoration:none}
+#st a:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+<h1>ESP32 色盘控制</h1>
+<div id="wc"><canvas id="wh"></canvas><div id="ind"></div></div>
+<div id="pv"></div>
+<div class="ctrl">
+  <input type="range" id="br" min="5" max="100" value="100">
+  <div class="lbl">亮度 <span id="brv">100</span>%</div>
+</div>
+<button class="btn" id="pwr">关灯</button>
+<div id="st"><span id="ws-st">连接中...</span><a href="/setup">WiFi 设置</a></div>
+<script>
+(function(){
+  var canvas=document.getElementById('wh');
+  var ctx=canvas.getContext('2d');
+  var ind=document.getElementById('ind');
+  var pv=document.getElementById('pv');
+  var brSlider=document.getElementById('br');
+  var brVal=document.getElementById('brv');
+  var pwrBtn=document.getElementById('pwr');
+  var stEl=document.getElementById('ws-st');
+
+  var S=280,C=S/2,R=S/2-2;
+  canvas.width=S;canvas.height=S;
+
+  var ws=null,lastT=0,DT=33;
+  var baseR=0,baseG=0,baseB=0;
+
+  function hsl2rgb(h,s,l){
+    if(s===0)return[Math.round(l*255),Math.round(l*255),Math.round(l*255)];
+    function f(p,q,t){
+      if(t<0)t+=1;if(t>1)t-=1;
+      if(t<1/6)return p+(q-p)*6*t;
+      if(t<.5)return q;
+      if(t<2/3)return p+(q-p)*(2/3-t)*6;
+      return p;
+    }
+    var q=l<.5?l*(1+s):l+s-l*s,p=2*l-q;
+    return[Math.round(f(p,q,h+1/3)*255),Math.round(f(p,q,h)*255),Math.round(f(p,q,h-1/3)*255)];
+  }
+
+  function drawWheel(){
+    var img=ctx.createImageData(S,S),d=img.data;
+    for(var y=0;y<S;y++){
+      for(var x=0;x<S;x++){
+        var dx=x-C,dy=y-C,dist=Math.sqrt(dx*dx+dy*dy);
+        if(dist<=R){
+          var hue=((Math.atan2(dy,dx)/(2*Math.PI))+1)%1;
+          var sat=dist/R;
+          var rgb=hsl2rgb(hue,sat,.5);
+          var i=(y*S+x)*4;
+          d[i]=rgb[0];d[i+1]=rgb[1];d[i+2]=rgb[2];d[i+3]=255;
+        }
+      }
+    }
+    ctx.putImageData(img,0,0);
+  }
+
+  function pickColor(x,y){
+    var dx=x-C,dy=y-C,dist=Math.sqrt(dx*dx+dy*dy);
+    if(dist>R)return null;
+    var hue=((Math.atan2(dy,dx)/(2*Math.PI))+1)%1;
+    return hsl2rgb(hue,dist/R,.5);
+  }
+
+  function send(r,g,b){
+    if(!ws||ws.readyState!==1)return;
+    var now=Date.now();
+    if(now-lastT<DT)return;
+    lastT=now;
+    ws.send(r+','+g+','+b);
+  }
+
+  function applyAndSend(){
+    var br=brSlider.value/100;
+    var r=Math.round(baseR*br),g=Math.round(baseG*br),b=Math.round(baseB*br);
+    pv.style.background='rgb('+r+','+g+','+b+')';
+    send(r,g,b);
+    pwrBtn.textContent='关灯';
+  }
+
+  function handleAt(cx,cy){
+    var rgb=pickColor(cx,cy);
+    if(!rgb)return;
+    baseR=rgb[0];baseG=rgb[1];baseB=rgb[2];
+    applyAndSend();
+    ind.style.display='block';
+    var rect=document.getElementById('wc').getBoundingClientRect();
+    ind.style.left=(cx*rect.width/S)+'px';
+    ind.style.top=(cy*rect.height/S)+'px';
+  }
+
+  function pos(e){
+    var t=e.touches?e.touches[0]:e;
+    var rect=canvas.getBoundingClientRect();
+    return[(t.clientX-rect.left)*S/rect.width,(t.clientY-rect.top)*S/rect.height];
+  }
+
+  canvas.addEventListener('touchstart',function(e){e.preventDefault();var p=pos(e);handleAt(p[0],p[1]);},{passive:false});
+  canvas.addEventListener('touchmove',function(e){e.preventDefault();var p=pos(e);handleAt(p[0],p[1]);},{passive:false});
+
+  var down=false;
+  canvas.addEventListener('mousedown',function(e){down=true;var p=pos(e);handleAt(p[0],p[1]);});
+  window.addEventListener('mousemove',function(e){if(down){var p=pos(e);handleAt(p[0],p[1]);}});
+  window.addEventListener('mouseup',function(){down=false;});
+
+  brSlider.addEventListener('input',function(){
+    brVal.textContent=brSlider.value;
+    if(baseR||baseG||baseB) applyAndSend();
+  });
+
+  pwrBtn.addEventListener('click',function(){
+    if(pwrBtn.textContent==='关灯'){
+      send(0,0,0);
+      pv.style.background='#000';
+      pwrBtn.textContent='开灯';
+    }else if(baseR||baseG||baseB){
+      applyAndSend();
+    }
+  });
+
+  function connect(){
+    var proto=location.protocol==='https:'?'wss:':'ws:';
+    ws=new WebSocket(proto+'//'+location.host+'/ws');
+    ws.onopen=function(){stEl.textContent='已连接';};
+    ws.onclose=function(){stEl.textContent='已断开';setTimeout(connect,2000);};
+    ws.onerror=function(){ws.close();};
+  }
+
+  // 获取 WiFi 状态
+  function updateWifiStatus(){
+    var xhr=new XMLHttpRequest();
+    xhr.open('GET','/status',true);
+    xhr.onload=function(){
+      if(xhr.status!==200)return;
+      try{
+        var d=JSON.parse(xhr.responseText);
+        if(d.status==='connected'&&d.ip){
+          stEl.textContent='已连接 ('+d.ip+')';
+        }else if(d.status==='connecting'){
+          stEl.textContent='WiFi 连接中...';
+        }else{
+          stEl.textContent='WiFi 未连接';
+        }
+      }catch(e){}
+    };
+    xhr.send();
+  }
+
+  drawWheel();
+  connect();
+  updateWifiStatus();
+})();
+</script>
+</body>
+</html>
