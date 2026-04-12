@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>WiFi 配置</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:Arial,sans-serif;background:#f0f2f5;display:flex;justify-content:center;align-items:center;min-height:100vh}
+.card{background:#fff;padding:30px 24px;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.08);width:90%;max-width:340px}
+h2{text-align:center;color:#333;margin-bottom:20px;font-size:20px}
+input{width:100%;padding:10px 12px;margin:8px 0;border:1px solid #ddd;border-radius:6px;font-size:15px;outline:none}
+input:focus{border-color:#4a90d9}
+button{width:100%;padding:11px;margin:10px 0 0;border:none;border-radius:6px;font-size:16px;cursor:pointer;transition:opacity .2s}
+.btn-primary{background:#4a90d9;color:#fff}
+.btn-primary:hover{opacity:.85}
+.btn-primary:disabled{background:#b0c4de;cursor:not-allowed}
+.btn-secondary{background:#e8e8e8;color:#333}
+.btn-secondary:hover{background:#d8d8d8}
+.msg{text-align:center;padding:16px 0;color:#555;font-size:15px;line-height:1.6}
+.msg .ip{color:#4a90d9;font-weight:bold;margin:4px 0;display:block}
+.msg .err{color:#e74c3c}
+.msg .mdns{color:#27ae60;font-weight:bold;margin:8px 0;display:block;font-size:14px}
+.hidden{display:none}
+label{display:block;font-size:13px;color:#666;margin-top:8px}
+.scan-btn{background:#fff;color:#4a90d9;border:1px solid #4a90d9;margin-bottom:4px}
+.scan-btn:hover{background:#f0f7ff}
+.scan-btn:disabled{color:#b0c4de;border-color:#b0c4de;cursor:not-allowed;background:#fff}
+.wifi-list{max-height:260px;overflow-y:auto;border:1px solid #ddd;border-radius:6px;margin:8px 0;background:#fafafa}
+.wifi-item{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;cursor:pointer;border-bottom:1px solid #eee;transition:background .15s}
+.wifi-item:last-child{border-bottom:none}
+.wifi-item:hover{background:#e8f0fe}
+.wifi-item:active{background:#d0e2f7}
+.wifi-name{flex:1;font-size:14px;color:#333;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-right:8px}
+.wifi-meta{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.wifi-lock{font-size:12px;color:#999}
+.wifi-bars{display:inline-flex;align-items:flex-end;height:14px;gap:1px}
+.wifi-bars span{display:block;width:3px;background:#ccc;border-radius:1px}
+.wifi-bars span.on{background:#4a90d9}
+.wifi-bars span:nth-child(1){height:4px}
+.wifi-bars span:nth-child(2){height:7px}
+.wifi-bars span:nth-child(3){height:10px}
+.wifi-bars span:nth-child(4){height:14px}
+.scan-loading,.scan-empty{text-align:center;padding:20px 0;color:#999;font-size:14px}
+.scan-empty{color:#bbb}
+.back-link{text-align:center;margin-top:12px}
+.back-link a{color:#4a90d9;text-decoration:none;font-size:14px}
+.back-link a:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+<div class="card">
+  <div id="form-section">
+    <h2>WiFi 配置</h2>
+    <form id="wifi-form" onsubmit="return doConnect(event)">
+      <label for="ssid">WiFi 名称</label>
+      <input type="text" id="ssid" name="ssid" placeholder="请输入或从列表选择" required>
+      <label for="password">WiFi 密码</label>
+      <input type="password" id="password" name="password" placeholder="开放网络请留空">
+      <button type="submit" class="btn-primary" id="btn-connect">连接</button>
+    </form>
+    <button type="button" class="scan-btn" id="btn-scan" onclick="doScan()">扫描附近的 WiFi</button>
+    <div id="wifi-list-container" class="hidden"></div>
+  </div>
+  <div id="status-section" class="hidden">
+    <div class="msg" id="status-msg"></div>
+  </div>
+  <div class="back-link"><a href="/">返回色盘</a></div>
+</div>
+<script>
+var pollTimer=null;
+function clearEl(el){while(el.firstChild)el.removeChild(el.firstChild);}
+function makeTag(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e;}
+
+function createBarsEl(bars){
+  var wrap=document.createElement('span');
+  wrap.className='wifi-bars';
+  for(var i=1;i<=4;i++){
+    var s=document.createElement('span');
+    if(i<=bars) s.className='on';
+    wrap.appendChild(s);
+  }
+  return wrap;
+}
+
+function doScan(){
+  var btn=document.getElementById('btn-scan');
+  var container=document.getElementById('wifi-list-container');
+  btn.disabled=true;
+  btn.textContent='扫描中...';
+  container.className='wifi-list';
+  clearEl(container);
+  var loading=document.createElement('div');
+  loading.className='scan-loading';
+  loading.textContent='正在扫描附近的 WiFi...';
+  container.appendChild(loading);
+
+  var xhr=new XMLHttpRequest();
+  xhr.open('GET','/scan',true);
+  xhr.timeout=15000;
+  xhr.onload=function(){
+    btn.disabled=false;
+    btn.textContent='重新扫描';
+    if(xhr.status!==200){
+      clearEl(container);
+      var err=document.createElement('div');
+      err.className='scan-loading';
+      err.textContent='扫描失败，请重试';
+      container.appendChild(err);
+      return;
+    }
+    var aps;
+    try{aps=JSON.parse(xhr.responseText);}catch(e){
+      clearEl(container);
+      var err2=document.createElement('div');
+      err2.className='scan-loading';
+      err2.textContent='扫描失败，请重试';
+      container.appendChild(err2);
+      return;
+    }
+    if(!aps||aps.length===0){
+      clearEl(container);
+      var empty=document.createElement('div');
+      empty.className='scan-empty';
+      empty.textContent='未发现附近的 WiFi';
+      container.appendChild(empty);
+      return;
+    }
+    clearEl(container);
+    for(var i=0;i<aps.length;i++){
+      (function(ap){
+        var item=document.createElement('div');
+        item.className='wifi-item';
+        var nameEl=document.createElement('span');
+        nameEl.className='wifi-name';
+        nameEl.textContent=ap.ssid;
+        item.appendChild(nameEl);
+        var meta=document.createElement('span');
+        meta.className='wifi-meta';
+        if(ap.encrypted){
+          var lock=document.createElement('span');
+          lock.className='wifi-lock';
+          lock.textContent='\u{1F512}';
+          meta.appendChild(lock);
+        }
+        meta.appendChild(createBarsEl(ap.bars));
+        item.appendChild(meta);
+        item.onclick=function(){selectWifi(ap.ssid,ap.encrypted);};
+        container.appendChild(item);
+      })(aps[i]);
+    }
+  };
+  xhr.onerror=function(){
+    btn.disabled=false;
+    btn.textContent='重新扫描';
+    clearEl(container);
+    var err3=document.createElement('div');
+    err3.className='scan-loading';
+    err3.textContent='扫描失败，请重试';
+    container.appendChild(err3);
+  };
+  xhr.ontimeout=function(){
+    btn.disabled=false;
+    btn.textContent='重新扫描';
+    clearEl(container);
+    var err4=document.createElement('div');
+    err4.className='scan-loading';
+    err4.textContent='扫描超时，请重试';
+    container.appendChild(err4);
+  };
+  xhr.send();
+}
+
+function selectWifi(ssid,encrypted){
+  document.getElementById('ssid').value=ssid;
+  var pwd=document.getElementById('password');
+  pwd.value='';
+  pwd.placeholder=encrypted?'请输入 WiFi 密码':'开放网络，无需密码';
+  pwd.focus();
+}
+
+function doConnect(e){
+  e.preventDefault();
+  var ssid=document.getElementById('ssid').value;
+  var pwd=document.getElementById('password').value;
+  if(!ssid){return false;}
+  document.getElementById('btn-connect').disabled=true;
+  document.getElementById('form-section').className='hidden';
+  document.getElementById('status-section').className='';
+  showConnecting();
+  var xhr=new XMLHttpRequest();
+  xhr.open('POST','/connect',true);
+  xhr.setRequestHeader('Content-Type','application/x-www-form-urlencoded');
+  xhr.send('ssid='+encodeURIComponent(ssid)+'&password='+encodeURIComponent(pwd));
+  xhr.onload=function(){
+    if(xhr.status===200){startPoll();}
+    else{showError('请求失败，请重试');}
+  };
+  xhr.onerror=function(){showError('请求失败，请重试');};
+  return false;
+}
+function startPoll(){pollTimer=setInterval(checkStatus,1000);}
+function checkStatus(){
+  var xhr=new XMLHttpRequest();
+  xhr.open('GET','/status',true);
+  xhr.onload=function(){
+    if(xhr.status!==200){return;}
+    var d=JSON.parse(xhr.responseText);
+    if(d.status==='connected'){
+      clearInterval(pollTimer);pollTimer=null;
+      showSuccess(d.ip);
+    }else if(d.status==='failed'){
+      clearInterval(pollTimer);pollTimer=null;
+      showError(d.reason||'连接失败');
+    }
+  };
+  xhr.send();
+}
+function showConnecting(){
+  var el=document.getElementById('status-msg');clearEl(el);
+  el.appendChild(document.createTextNode('正在连接...'));
+}
+function showSuccess(ip){
+  var el=document.getElementById('status-msg');clearEl(el);
+  el.appendChild(document.createTextNode('连接成功！'));
+  el.appendChild(makeTag('span','ip','IP: '+ip));
+  var mdns=makeTag('span','mdns','请访问 http://esp32-color.local/ 控制灯光');
+  el.appendChild(mdns);
+  el.appendChild(document.createElement('br'));
+  el.appendChild(document.createTextNode('切换到家庭 WiFi 后即可使用'));
+}
+function showError(reason){
+  var el=document.getElementById('status-msg');clearEl(el);
+  var errLine=makeTag('span','err','连接失败');
+  el.appendChild(errLine);
+  el.appendChild(document.createElement('br'));
+  el.appendChild(document.createTextNode(reason));
+  el.appendChild(document.createElement('br'));
+  var btn=makeTag('button','btn-secondary','重新配置');
+  btn.style.marginTop='12px';
+  btn.onclick=resetForm;
+  el.appendChild(btn);
+}
+function resetForm(){
+  if(pollTimer){clearInterval(pollTimer);pollTimer=null;}
+  document.getElementById('form-section').className='';
+  document.getElementById('status-section').className='hidden';
+  document.getElementById('btn-connect').disabled=false;
+  document.getElementById('password').value='';
+  document.getElementById('password').placeholder='开放网络请留空';
+  document.getElementById('btn-scan').disabled=false;
+  document.getElementById('btn-scan').textContent='扫描附近的 WiFi';
+  var container=document.getElementById('wifi-list-container');
+  clearEl(container);
+  container.className='hidden';
+}
+</script>
+</body>
+</html>
