@@ -1,0 +1,2 @@
+# 无外部依赖
+# esp_lcd / esp_lcd_panel_io_i2c / esp_lcd_panel_ssd1306 / driver/i2c_master 均为 ESP-IDF 内置组件
